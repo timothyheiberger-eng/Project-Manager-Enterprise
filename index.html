@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Project Manager Enterprise Ver. 1.0</title>
+<style>
+:root{--bg:#07111f;--panel:#0f1f35;--card:#132943;--accent:#f5b942;--accent2:#38bdf8;--text:#eef6ff;--muted:#a9bad0;--line:#29445f;--danger:#ef4444;--good:#22c55e}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:linear-gradient(135deg,#07111f,#10233b);color:var(--text)}
+header{padding:18px 22px;background:#081525;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:20}.seal{width:48px;height:48px;border-radius:14px;background:var(--accent);color:#07111f;display:grid;place-items:center;font-weight:900}h1{margin:0;font-size:23px}small{color:var(--muted)}
+.toolbar{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}button,input,select,textarea{font:inherit}button{border:0;border-radius:10px;padding:10px 13px;background:var(--accent);color:#07111f;font-weight:700;cursor:pointer}.secondary{background:#223a57;color:var(--text);border:1px solid var(--line)}.danger{background:var(--danger);color:white}.good{background:var(--good);color:#04130a}
+main{display:grid;grid-template-columns:230px 1fr;min-height:calc(100vh - 86px)}nav{background:#0b1829;border-right:1px solid var(--line);padding:14px;position:sticky;top:85px;height:calc(100vh - 85px);overflow:auto}nav button{width:100%;margin:4px 0;text-align:left;background:transparent;color:var(--text);border:1px solid transparent}nav button.active,nav button:hover{background:#193353;border-color:var(--line)}
+.content{padding:18px}.section{display:none}.section.active{display:block}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px}.card{background:rgba(19,41,67,.93);border:1px solid var(--line);border-radius:16px;padding:15px;box-shadow:0 12px 30px rgba(0,0,0,.18)}.kpi{font-size:30px;font-weight:900;color:var(--accent)}
+form{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin:10px 0}.wide{grid-column:1/-1}label{font-size:12px;color:var(--muted)}input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:#071827;color:var(--text)}textarea{min-height:80px}
+table{width:100%;border-collapse:collapse;margin-top:12px;background:#0b1829;border-radius:12px;overflow:hidden}th,td{padding:9px;border-bottom:1px solid var(--line);text-align:left;font-size:13px;vertical-align:top}th{background:#10243c;color:#dbeafe}.actions{display:flex;gap:6px;flex-wrap:wrap}.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#1f3a5a;color:#dbeafe}.footer{color:var(--muted);font-size:12px;text-align:center;padding:14px}.printOnly{display:none}
+@media(max-width:800px){main{grid-template-columns:1fr}nav{position:static;height:auto;display:grid;grid-template-columns:repeat(2,1fr)}}
+@media print{header,nav,.toolbar,.no-print,button{display:none!important}main{display:block}.content{padding:0}.section{display:block;page-break-after:always}.card{box-shadow:none;border:1px solid #999;color:#000;background:#fff}body{background:#fff;color:#000}input,select,textarea{border:0;color:#000}.printOnly{display:block}table{color:#000;background:#fff}th{color:#000;background:#eee}}
+</style>
+</head>
+<body>
+<header><div class="seal">PME</div><div><h1>Project Manager Enterprise Ver. 1.0</h1><small>Commercial Construction Project Management System</small></div><div class="toolbar no-print"><button onclick="backupData()">Backup JSON</button><button class="secondary" onclick="document.getElementById('restoreFile').click()">Restore JSON</button><input id="restoreFile" type="file" accept="application/json" hidden onchange="restoreData(event)"><button class="secondary" onclick="window.print()">Print Reports</button></div></header>
+<main><nav id="nav" class="no-print"></nav><div class="content" id="content"></div></main><div class="footer">Local browser database saved on this device using localStorage. Use Backup JSON often before GitHub updates.</div>
+<script>
+const APP_KEY='project_manager_enterprise_v1';
+const modules=[
+ ['dashboard','Dashboard'],['projects','Projects'],['clients','Clients'],['subcontractors','Subcontractors'],['contracts','Contracts'],['submittals','Submittal Log'],['rfis','RFI Log'],['tasks','Tasks'],['schedule','Schedule'],['procurement','Procurement Log'],['payapps','Pay Applications'],['budget','Project Budget'],['reports','Reports'],['settings','Settings']];
+const schemas={
+projects:['Project Name','Project Number','Client','Address','PM','Superintendent','Start Date','Target Completion','Status','Contract Amount','Notes'],
+clients:['Client Name','Contact','Phone','Email','Address','Notes'],
+subcontractors:['Company','Trade','Contact','Phone','Email','COI Expiration','Contract Status','Notes'],
+contracts:['Project','Subcontractor/Owner','Contract Type','Original Amount','Approved COs','Current Contract','Executed Date','Status','Notes'],
+submittals:['Project','Submittal #','Spec Section','Description','Subcontractor','Date Sent','Due Date','Date Returned','Status','Architect Response','Notes'],
+rfis:['Project','RFI #','Subject','Question','Submitted By','Date Sent','Due Date','Date Answered','Status','Response','Cost/Schedule Impact'],
+tasks:['Project','Task','Assigned To','Priority','Due Date','Status','Notes'],
+schedule:['Project','Activity','Start Date','Finish Date','Duration','Predecessor','Responsible Party','Status','Notes'],
+procurement:['Project','Item','Vendor/Sub','Needed By','Order Date','Expected Delivery','Actual Delivery','Status','Cost','Notes'],
+payapps:['Project','Pay App #','Period Ending','Contract Amount','Work Completed','Stored Materials','Retainage','Previous Paid','Amount Due','Status','Notes'],
+budget:['Project','Cost Code','Description','Original Budget','Approved Changes','Committed','Actual Cost','Forecast Cost','Notes'],
+settings:['Company Name','Address','Phone','Email','Default PM','Notes']
+};
+let db=loadDB();
+function blankDB(){let o={};Object.keys(schemas).forEach(k=>o[k]=[]);return o}
+function loadDB(){try{return JSON.parse(localStorage.getItem(APP_KEY))||blankDB()}catch(e){return blankDB()}}
+function saveDB(){localStorage.setItem(APP_KEY,JSON.stringify(db));render()}
+function id(){return Date.now().toString(36)+Math.random().toString(36).slice(2,7)}
+function money(v){let n=parseFloat(String(v||'').replace(/[^0-9.-]/g,''));return isNaN(n)?0:n}
+function fmt(n){return '$'+Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
+function show(sec){document.querySelectorAll('.section').forEach(x=>x.classList.remove('active'));document.getElementById(sec).classList.add('active');document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.sec==sec))}
+function renderNav(){nav.innerHTML=modules.map(m=>`<button data-sec="${m[0]}" onclick="show('${m[0]}')">${m[1]}</button>`).join('')}
+function formFor(key){let fields=schemas[key];return `<div class="card"><h3>Add / Edit ${labelFor(key)}</h3><form onsubmit="addRecord(event,'${key}')">${fields.map(f=>`<div class="${['Notes','Question','Response','Cost/Schedule Impact'].includes(f)?'wide':''}"><label>${f}</label>${['Notes','Question','Response','Cost/Schedule Impact'].includes(f)?`<textarea name="${f}"></textarea>`:`<input name="${f}" type="${f.includes('Date')||f.includes('Due')||f.includes('Start')||f.includes('Finish')||f.includes('Ending')||f.includes('Expiration')?'date':'text'}">`}</div>`).join('')}<div class="wide"><button>Save Record</button></div></form></div>`}
+function tableFor(key){let fields=schemas[key];let rows=db[key]||[];return `<div class="card"><h3>${labelFor(key)}</h3><table><thead><tr>${fields.slice(0,7).map(f=>`<th>${f}</th>`).join('')}<th>Actions</th></tr></thead><tbody>${rows.map(r=>`<tr>${fields.slice(0,7).map(f=>`<td>${r[f]||''}</td>`).join('')}<td class="actions"><button class="secondary" onclick="editRecord('${key}','${r._id}')">Edit</button><button class="danger" onclick="deleteRecord('${key}','${r._id}')">Delete</button></td></tr>`).join('')||`<tr><td colspan="8">No records yet.</td></tr>`}</tbody></table></div>`}
+function labelFor(key){return modules.find(m=>m[0]==key)?.[1]||key}
+function addRecord(e,key){e.preventDefault();let data=Object.fromEntries(new FormData(e.target).entries());data._id=e.target.dataset.edit||id();let arr=db[key];let i=arr.findIndex(x=>x._id==data._id);if(i>=0)arr[i]=data;else arr.push(data);e.target.reset();delete e.target.dataset.edit;saveDB()}
+function editRecord(key,rid){let r=db[key].find(x=>x._id==rid);show(key);let form=document.querySelector(`#${key} form`);schemas[key].forEach(f=>{if(form.elements[f])form.elements[f].value=r[f]||''});form.dataset.edit=rid;scrollTo(0,0)}
+function deleteRecord(key,rid){if(confirm('Delete this record?')){db[key]=db[key].filter(x=>x._id!=rid);saveDB()}}
+function moduleSection(key){return `<section id="${key}" class="section"><h2>${labelFor(key)}</h2>${formFor(key)}${tableFor(key)}</section>`}
+function dashboard(){let totalBudget=(db.budget||[]).reduce((s,r)=>s+money(r['Original Budget'])+money(r['Approved Changes']),0);let committed=(db.budget||[]).reduce((s,r)=>s+money(r['Committed']),0);let actual=(db.budget||[]).reduce((s,r)=>s+money(r['Actual Cost']),0);let openRFI=(db.rfis||[]).filter(r=>(r.Status||'').toLowerCase()!='closed').length;let openSub=(db.submittals||[]).filter(r=>(r.Status||'').toLowerCase()!='approved').length;return `<section id="dashboard" class="section active"><h2>Enterprise Dashboard</h2><div class="grid"><div class="card"><small>Active Projects</small><div class="kpi">${db.projects.length}</div></div><div class="card"><small>Open RFIs</small><div class="kpi">${openRFI}</div></div><div class="card"><small>Open Submittals</small><div class="kpi">${openSub}</div></div><div class="card"><small>Budget</small><div class="kpi">${fmt(totalBudget)}</div></div><div class="card"><small>Committed</small><div class="kpi">${fmt(committed)}</div></div><div class="card"><small>Actual Cost</small><div class="kpi">${fmt(actual)}</div></div></div><div class="card"><h3>Quick Notes</h3><p>Use this as a single-file GitHub Pages app. Data saves locally in the browser. Before replacing index.html on GitHub, always tap <b>Backup JSON</b>.</p></div></section>`}
+function reports(){return `<section id="reports" class="section"><h2>Reports</h2><div class="grid">${['projects','submittals','rfis','tasks','schedule','procurement','payapps','budget'].map(k=>`<div class="card"><h3>${labelFor(k)}</h3><p>${(db[k]||[]).length} records</p><button onclick="show('${k}')">Open</button></div>`).join('')}</div></section>`}
+function settings(){return moduleSection('settings')+`<section id="settings_extra" class="section"></section>`}
+function render(){content.innerHTML=dashboard()+modules.filter(m=>!['dashboard','reports','settings'].includes(m[0])).map(m=>moduleSection(m[0])).join('')+reports()+moduleSection('settings');renderNav();let cur=document.querySelector('.section.active')?.id||'dashboard';show(cur)}
+function backupData(){let blob=new Blob([JSON.stringify(db,null,2)],{type:'application/json'});let a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Project_Manager_Enterprise_Backup_'+new Date().toISOString().slice(0,10)+'.json';a.click()}
+function restoreData(e){let file=e.target.files[0];if(!file)return;let reader=new FileReader();reader.onload=()=>{try{db=JSON.parse(reader.result);saveDB();alert('JSON restored successfully.')}catch(err){alert('Could not restore JSON file.')}};reader.readAsText(file)}
+render();
+</script>
+</body>
+</html>
